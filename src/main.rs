@@ -1,9 +1,9 @@
 use std::process;
 
+mod comfy_table;
+mod cumulative_price_change;
 mod find_tickers;
 mod klines;
-mod cumulative_price_change;
-mod comfy_table;
 
 pub mod storage_utils;
 
@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     if let Err(e) = cumulative_price_change::run().await {
         eprintln!("Error running analysis: {}", e);
     }
-    
+
     // Step 4: Display results in formatted table
     if let Err(e) = comfy_table::run() {
         eprintln!("❌ Failed at Step 4: {}", e);
