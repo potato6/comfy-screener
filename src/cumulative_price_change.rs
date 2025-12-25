@@ -1,9 +1,10 @@
-use anyhow::{Context, Result};
+use crate::storage_utils::AsyncStorageManager; // Use your new manager
+use anyhow::{ Result};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
-use std::fs::File;
-use std::io::BufReader;
+
+// --- Data Structures & Custom Deserialization (Unchanged) ---
 
 #[derive(Deserialize, Debug)]
 struct InputKline {
@@ -82,6 +83,8 @@ where
     deserializer.deserialize_any(LenientF64Visitor)
 }
 
+// --- Domain Logic (Unchanged) ---
+
 fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
     if klines.is_empty() {
         return None;
@@ -105,35 +108,28 @@ fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
     Some((cumulative_return, last_close_time))
 }
 
-pub fn run() -> Result<()> {
-    let exe_path = std::env::current_exe()?;
-    let base_dir = exe_path
-        .parent()
-        .context("Failed to determine binary directory")?;
+// --- Main Execution (Refactored) ---
 
-    let storage_dir = base_dir.join("storage");
-    let klines_file = storage_dir.join("klines.json");
-    let results_file = storage_dir.join("results.json");
+pub async fn run() -> Result<()> {
+    // 1. Initialize Manager (Handles paths and storage dir creation)
+    let storage = AsyncStorageManager::new_relative("storage").await?;
 
-    if !klines_file.exists() {
-        eprintln!("Required data file not found at {:?}", klines_file);
-        return Ok(());
-    }
+    println!("Reading and parsing klines.json...");
 
-    let file = File::open(&klines_file).context("Failed to open klines file")?;
-    let reader = BufReader::new(file);
-
-    println!(
-        "Reading and parsing {:?}...",
-        klines_file.file_name().unwrap_or_default()
-    );
-
-    let all_symbols_data: Vec<SymbolData> =
-        serde_json::from_reader(reader).context("Failed to parse klines.json")?;
+    // 2. Load Data using Generic Manager
+    // We try to load. If it fails (file missing), we handle it gracefully.
+    let all_symbols_data: Vec<SymbolData> = match storage.load("klines").await {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!("Could not load klines.json: {}. Skipping analysis.", e);
+            return Ok(());
+        }
+    };
 
     let mut results = Vec::with_capacity(all_symbols_data.len());
     let mut max_close_time = 0;
 
+    // 3. Process Data (Pure logic, no I/O)
     for symbol_data in all_symbols_data {
         if let Some((movement_pct, last_close_time)) = analyze_klines_data(&symbol_data.klines) {
             results.push(ResultItem {
@@ -148,6 +144,7 @@ pub fn run() -> Result<()> {
         }
     }
 
+    // Sort results
     results.sort_unstable_by(|a, b| {
         b.movement_pct
             .partial_cmp(&a.movement_pct)
@@ -164,8 +161,9 @@ pub fn run() -> Result<()> {
         results,
     };
 
-    let json_output = serde_json::to_string(&output_data)?;
-    std::fs::write(&results_file, json_output)?;
+    // 4. Save Results using Generic Manager
+    println!("Saving {} results to storage...", output_data.results.len());
+    storage.save("results", &output_data).await?;
 
     Ok(())
 }

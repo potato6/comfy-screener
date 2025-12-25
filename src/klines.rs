@@ -1,3 +1,4 @@
+use crate::storage_utils::AsyncStorageManager; // Import your new manager
 use anyhow::Result;
 use configparser::ini::Ini;
 use regex::Regex;
@@ -152,24 +153,24 @@ async fn fetch_kline(
 }
 
 pub async fn run() -> Result<()> {
-    let exe_path = std::env::current_exe()?;
-    let base_dir = exe_path
+    // 1. Initialize Storage Manager (creates ../storage automatically)
+    let storage = AsyncStorageManager::new_relative("storage").await?;
+
+    // 2. Load Config (INI is not JSON, so we handle it manually, but use storage path as anchor)
+    // storage.base_dir is ".../storage", so parent is the binary folder.
+    let config_path = storage
+        .base_dir
         .parent()
-        .ok_or(anyhow::anyhow!("Could not determine binary directory"))?;
-
-    let config_path = base_dir.join("config.ini");
-    let storage_dir = base_dir.join("storage");
-
-    if !storage_dir.exists() {
-        std::fs::create_dir(&storage_dir)?;
-    }
+        .ok_or(anyhow::anyhow!("Invalid storage path"))?
+        .join("config.ini");
 
     let mut config = Ini::new();
     let config_str = config_path
         .to_str()
         .ok_or(anyhow::anyhow!("Invalid config path"))?;
+    
     if config.load(config_str).is_err() {
-        return Err(anyhow::anyhow!("config.ini not found or invalid"));
+        return Err(anyhow::anyhow!("config.ini not found at {:?}", config_path));
     }
 
     let limit_val: u32 = config
@@ -186,9 +187,9 @@ pub async fn run() -> Result<()> {
         limit_val, weight_per_req
     );
 
-    let json_path = storage_dir.join("exchange_info.json");
-    let file_content = tokio::fs::read(&json_path).await?;
-    let exchange_info: ExchangeInfo = serde_json::from_slice(&file_content)?;
+    // 3. Load Exchange Info using Generic Manager (Strictly Typed)
+    // This replaces manual fs::read and serde_json::from_slice
+    let exchange_info: ExchangeInfo = storage.load("exchange_info").await?;
 
     let api_limit_total = exchange_info
         .rate_limits
@@ -250,9 +251,9 @@ pub async fn run() -> Result<()> {
         }
     }
 
-    let output_path = storage_dir.join("klines.json");
-    let json_output = serde_json::to_string_pretty(&all_results)?;
-    tokio::fs::write(output_path, json_output).await?;
+    // 4. Save Results using Generic Manager (Atomic Write)
+    println!("Saving {} klines to storage...", all_results.len());
+    storage.save("klines", &all_results).await?;
 
     Ok(())
 }
