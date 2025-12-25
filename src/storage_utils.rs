@@ -15,7 +15,7 @@ pub struct KlineConfig {
 pub struct AppConfig {
     pub klines: KlineConfig,
 
-    // filtering logic
+    // This is now the only place responsible for filtering logic
     #[serde(default)]
     pub filters: HashMap<String, String>,
 }
