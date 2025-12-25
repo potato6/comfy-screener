@@ -1,6 +1,24 @@
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KlineConfig {
+    pub limit: u32,
+    pub interval: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TradingConfig {
+    pub quote_asset: String,
+    pub contract_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AppConfig {
+    pub klines: KlineConfig,
+    pub trading: TradingConfig,
+}
 
 pub struct AsyncStorageManager {
     pub base_dir: PathBuf,

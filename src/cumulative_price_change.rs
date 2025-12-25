@@ -1,5 +1,5 @@
 use crate::storage_utils::AsyncStorageManager; // Use your new manager
-use anyhow::{ Result};
+use anyhow::Result;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
@@ -90,7 +90,8 @@ fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
         return None;
     }
 
-    let is_valid = |k: &&InputKline| k.open.is_some() && k.close.is_some() && k.close_time.is_some();
+    let is_valid =
+        |k: &&InputKline| k.open.is_some() && k.close.is_some() && k.close_time.is_some();
 
     let first_kline = klines.iter().find(is_valid)?;
     let last_kline = klines.iter().rfind(is_valid)?;

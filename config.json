@@ -1,0 +1,10 @@
+{
+    "klines": {
+        "limit": 500,
+        "interval": "1m"
+    },
+    "trading": {
+        "quote_asset": "USDT",
+        "contract_type": "PERPETUAL"
+    }
+}

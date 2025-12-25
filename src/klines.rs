@@ -1,4 +1,4 @@
-use crate::storage_utils::AsyncStorageManager; // Import your new manager
+use crate::storage_utils::AsyncStorageManager;
 use anyhow::Result;
 use configparser::ini::Ini;
 use regex::Regex;
@@ -168,7 +168,7 @@ pub async fn run() -> Result<()> {
     let config_str = config_path
         .to_str()
         .ok_or(anyhow::anyhow!("Invalid config path"))?;
-    
+
     if config.load(config_str).is_err() {
         return Err(anyhow::anyhow!("config.ini not found at {:?}", config_path));
     }
@@ -243,7 +243,10 @@ pub async fn run() -> Result<()> {
             let elapsed = start_time.elapsed();
             if elapsed.as_secs() < 60 {
                 let wait_time = Duration::from_secs(62) - elapsed; // 60s + 2s buffer
-                println!("Batch done in {:.2?}. Waiting {:.2?}...", elapsed, wait_time);
+                println!(
+                    "Batch done in {:.2?}. Waiting {:.2?}...",
+                    elapsed, wait_time
+                );
                 tokio::time::sleep(wait_time).await;
             } else {
                 println!("Batch took {:.2?}. Continuing...", elapsed);
