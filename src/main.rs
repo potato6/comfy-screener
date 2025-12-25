@@ -42,7 +42,6 @@ async fn main() -> Result<()> {
         eprintln!("❌ Failed at Step 4: {}", e);
         process::exit(1);
     }
-    println!("\n✅ All steps completed successfully!");
 
     Ok(())
 }
