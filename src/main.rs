@@ -1,38 +1,34 @@
-use std::process;
-
 mod comfy_table;
 mod cumulative_price_change;
 mod find_tickers;
 mod klines;
-
-pub mod storage_utils;
+mod storage_utils; // <--- Register the new module
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("╔════════════════════════════════════════╗");
-    println!("║  Crypto Price Change Analysis Pipeline ║");
-    println!("╚════════════════════════════════════════╝\n");
-
-    // Step 1: Fetch exchange info and save to storage/exchange_info.json
+    // Step 1: Fetch Metadata
+    println!("\n--- Step 1: Fetching Exchange Info ---");
     if let Err(e) = find_tickers::fetch_exchange_info().await {
-        eprintln!("❌ Failed at Step 1: {}", e);
-        process::exit(1);
+        eprintln!("Error fetching info: {}", e);
+        return Err(e);
     }
 
+    // Step 2: Download Candles
+    println!("\n--- Step 2: Fetching Klines ---");
     if let Err(e) = klines::run().await {
-        eprintln!("❌ Failed at Step 2: {}", e);
-        process::exit(1);
+        eprintln!("Error fetching klines: {}", e);
     }
 
-    // Step 3: Calculate cumulative price changes
+    // Step 3: Analyze Data
+    println!("\n--- Step 3: Analyzing Price Changes ---");
     if let Err(e) = cumulative_price_change::run().await {
-        eprintln!("Error running analysis: {}", e);
+        eprintln!("Error analyzing data: {}", e);
     }
 
-    // Step 4: Display results in formatted table
-    if let Err(e) = comfy_table::run() {
-        eprintln!("❌ Failed at Step 4: {}", e);
-        process::exit(1);
+    // Step 4: Display Results
+    println!("\n--- Step 4: Displaying Table ---");
+    if let Err(e) = comfy_table::run().await {
+        eprintln!("Error displaying table: {}", e);
     }
 
     Ok(())

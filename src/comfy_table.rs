@@ -1,19 +1,21 @@
+use crate::storage_utils::AsyncStorageManager;
 use anyhow::Result;
-use chrono::{DateTime};
+use chrono::DateTime; // Make sure 'chrono' is in Cargo.toml
 use comfy_table::{
-    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_BORDERS_ONLY, Attribute, Cell, CellAlignment,
-    Color, ContentArrangement, Table,
+    Attribute, Cell, CellAlignment, Color, ContentArrangement, Table,
+    modifiers::UTF8_ROUND_CORNERS, presets::UTF8_BORDERS_ONLY,
 };
 use serde::Deserialize;
-use std::fs;
 
-#[derive(Deserialize)]
-struct ProcessedData {
+// --- Data Structures (Matching results.json) ---
+
+#[derive(Deserialize, Debug)]
+struct OutputData {
     last_updated_timestamp: i64,
     results: Vec<AssetResult>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct AssetResult {
     symbol: String,
     #[serde(rename = "subType")]
@@ -21,7 +23,15 @@ struct AssetResult {
     movement_pct: f64,
 }
 
+// --- Visual Helpers (Restored) ---
+
+/// Calculates a "brightness ratio" based on how close the value is to the top mover.
+/// Top mover = 1.0 brightness. Smaller movers fade out to 0.4 brightness.
 fn get_visibility_ratio(current_pct: f64, top_pct: f64) -> f64 {
+    if top_pct == 0.0 {
+        return 1.0;
+    }
+
     let mut ratio = 0.4 + 0.6 * (current_pct / top_pct);
     if ratio < 0.4 {
         ratio = 0.4;
@@ -29,38 +39,42 @@ fn get_visibility_ratio(current_pct: f64, top_pct: f64) -> f64 {
     ratio
 }
 
+/// Converts Unix Milliseconds to "DD-MM-YYYY HH:MM:SS"
 fn format_timestamp(ts_ms: i64) -> String {
     let seconds = ts_ms / 1000;
     let nanoseconds = ((ts_ms % 1000) * 1_000_000) as u32;
 
-    // FIX: Use DateTime::from_timestamp directly, which handles the conversion safely
     if let Some(dt) = DateTime::from_timestamp(seconds, nanoseconds) {
         return dt.format("%d-%m-%Y %H:%M:%S").to_string();
     }
     "Unknown Time".to_string()
 }
 
-pub fn run() -> Result<()> {
-    let exe_path = std::env::current_exe()?;
-    let base_dir = exe_path.parent().unwrap();
-    let results_file = base_dir.join("storage").join("results.json");
+// --- Main Execution ---
 
-    if !results_file.exists() {
-        println!("File not found: {:?}", results_file);
-        return Ok(());
-    }
+pub async fn run() -> Result<()> {
+    // 1. Initialize Storage Manager (Generic)
+    let storage = AsyncStorageManager::new_relative("storage").await?;
 
-    let content = fs::read_to_string(results_file)?;
-    let data: ProcessedData = serde_json::from_str(&content)?;
+    // 2. Load Data (Typed)
+    let data: OutputData = match storage.load("results").await {
+        Ok(d) => d,
+        Err(_) => {
+            println!("No results found. Please run the analysis first.");
+            return Ok(());
+        }
+    };
 
     if data.results.is_empty() {
-        println!("No data found.");
+        println!("No data found in results.json");
         return Ok(());
     }
 
+    // 3. Prepare Header Info
     let time_str = format_timestamp(data.last_updated_timestamp);
     let title = format!("(Data taken at {} UTC)", time_str);
 
+    // 4. Configure Table (Visual Styles)
     let mut table = Table::new();
     table
         .load_preset(UTF8_BORDERS_ONLY)
@@ -75,23 +89,33 @@ pub fn run() -> Result<()> {
                 .set_alignment(CellAlignment::Right),
         ]);
 
-    let top_mover_pct = data.results[0].movement_pct;
-    let safe_top_pct = if top_mover_pct == 0.0 { 1.0 } else { top_mover_pct };
+    // 5. Calculate Color Logic
+    // We grab the highest % to use as our "100% brightness" baseline
+    let top_mover_pct = data.results.first().map(|r| r.movement_pct).unwrap_or(1.0);
+    let safe_top_pct = if top_mover_pct == 0.0 {
+        1.0
+    } else {
+        top_mover_pct
+    };
 
+    // 6. Populate Rows (Top 15 Only)
     let mut rank = 1;
     for asset in data.results.iter().take(15) {
         let ratio = get_visibility_ratio(asset.movement_pct, safe_top_pct);
 
+        // Calculate Faded Colors
         let cyan_val = (255.0 * ratio) as u8;
         let green_val = (255.0 * ratio) as u8;
         let gray_val = (150.0 * ratio) as u8;
 
+        // Format Subtypes
         let subtype_str = if asset.sub_type.is_empty() {
             "N/A".to_string()
         } else {
             format!("({})", asset.sub_type.join(", "))
         };
 
+        // Create Cells
         let rank_cell = Cell::new(rank).fg(Color::DarkGrey);
 
         let asset_cell = Cell::new(&asset.symbol).fg(Color::Rgb {
