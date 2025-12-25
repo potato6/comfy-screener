@@ -23,8 +23,6 @@ struct AssetResult {
     movement_pct: f64,
 }
 
-// --- Visual Helpers (Restored) ---
-
 /// Calculates a "brightness ratio" based on how close the value is to the top mover.
 /// Top mover = 1.0 brightness. Smaller movers fade out to 0.4 brightness.
 fn get_visibility_ratio(current_pct: f64, top_pct: f64) -> f64 {

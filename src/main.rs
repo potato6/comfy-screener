@@ -2,7 +2,7 @@ mod comfy_table;
 mod cumulative_price_change;
 mod find_tickers;
 mod klines;
-mod storage_utils; // <--- Register the new module
+mod storage_utils;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

@@ -5,9 +5,8 @@ use serde::{Deserialize, Serialize}; // Serialize is now used
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
-// --- DATA STRUCTURES ---
+// DATA
 
-// FIX: Added Serialize here so we can save it to storage
 #[derive(Serialize, Deserialize)]
 pub struct ExchangeInfo {
     pub symbols: Vec<Map<String, Value>>,
@@ -15,7 +14,6 @@ pub struct ExchangeInfo {
     pub rate_limits: Vec<RateLimit>,
 }
 
-// FIX: Added Serialize here too
 #[derive(Serialize, Deserialize)]
 pub struct RateLimit {
     #[serde(rename = "rateLimitType")]
@@ -24,7 +22,7 @@ pub struct RateLimit {
     pub limit: u32,
 }
 
-// --- FILTER LOGIC ---
+// FILTER
 
 fn matches_filters(symbol: &Map<String, Value>, filters: &HashMap<String, String>) -> bool {
     for (key, required_value) in filters {
@@ -50,7 +48,7 @@ fn matches_filters(symbol: &Map<String, Value>, filters: &HashMap<String, String
     true
 }
 
-// --- MAIN FUNCTION ---
+// MAIN
 
 pub async fn fetch_exchange_info() -> Result<()> {
     let storage = AsyncStorageManager::new_relative("storage").await?;

@@ -12,22 +12,15 @@ pub struct KlineConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct TradingConfig {
-    pub quote_asset: String,
-    pub contract_type: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct AppConfig {
     pub klines: KlineConfig,
-    pub trading: TradingConfig,
-    // Add the generic filters map here
+
+    // filtering logic
     #[serde(default)]
     pub filters: HashMap<String, String>,
 }
 
-// --- STORAGE MANAGER ---
-
+// STORAGE MANAGER
 pub struct AsyncStorageManager {
     pub base_dir: PathBuf,
 }
