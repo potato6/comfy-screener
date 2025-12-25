@@ -1,12 +1,9 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-// ================================================================
 // CONFIGURATION STRUCTS
-// ================================================================
-// These structs define the expected structure of your 'config.json'.
-// By deriving Serialize/Deserialize, we can load the JSON directly
 // into these Rust types without manual parsing.
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -71,14 +68,14 @@ impl AsyncStorageManager {
         let tmp_path = self.base_dir.join(format!("{}.tmp", file_name));
 
         // Serialization
-        let json_bytes = serde_json::to_vec(data)?;
+        // CHANGE: Used to be `to_vec` (minified).
+        // Now using `to_vec_pretty` to make it human-readable.
+        let json_bytes = serde_json::to_vec_pretty(data)?;
 
         // 1. Write data to the temporary file
         tokio::fs::write(&tmp_path, json_bytes).await?;
 
         // 2. Atomically rename the temp file to the final name.
-        //    This operation is instant and ensures the file is either
-        //    fully updated or not changed at all.
         tokio::fs::rename(tmp_path, final_path).await?;
 
         Ok(())
