@@ -102,10 +102,19 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
         }
 
         if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if !handle_key_event(key, &mut app, &data_tx) {
-                    return Err(anyhow!("Quit"));
+            match event::read()? {
+                // Handle key presses
+                Event::Key(key) => {
+                    if !handle_key_event(key, &mut app, &data_tx) {
+                        return Err(anyhow!("Quit"));
+                    }
                 }
+                // Handle window resizing explicitly
+                Event::Resize(_, _) => {
+                    // The loop will continue and terminal.draw() will automatically
+                    // pick up the new size on the next iteration.
+                }
+                _ => {}
             }
         }
     }
@@ -186,10 +195,10 @@ fn ui(f: &mut Frame, app: &App) {
         Table::new(
             rows,
             [
-                Constraint::Length(6),
-                Constraint::Length(20),
-                Constraint::Min(20),
-                Constraint::Length(20),
+                Constraint::Length(6),      // Rank: Keep fixed small width
+                Constraint::Percentage(20), // Asset: Takes 20% of width
+                Constraint::Percentage(50), // Type: Takes 50% (main flexible column)
+                Constraint::Percentage(20), // Movement: Takes 20%
             ],
         )
         .header(header)
