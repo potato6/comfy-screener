@@ -1,17 +1,20 @@
 [package]
 name = "comfy-screener"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "*", features = ["derive"] }
-serde_json = { version = "*" }
-anyhow = "*"
-chrono = "*"
-comfy-table = "*"
-crossterm = "*"
-tokio = { version = "*", features = ["full"] }
-reqwest = { version = "*", features = ["json"] }
-configparser = "*"
-regex = "*"
-futures = "*"
+anyhow = "1.0.82"
+chrono = "0.4.38"
+comfy-table = "7.1.1"
+crossterm = "0.27.0"
+futures = "0.3.30"
+ratatui = { version = "0.26.2", features = ["crossterm"] }
+reqwest = { version = "0.12.3", features = ["json"] }
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"
+tokio = { version = "1.37.0", features = ["full"] }
+regex = "1.10.4"
+clearscreen = "2.0.1"

@@ -1,4 +1,4 @@
-use crate::storage_utils::AsyncStorageManager; // Use your new manager
+use crate::storage_utils::AsyncStorageManager;
 use anyhow::Result;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -90,9 +90,7 @@ fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
         return None;
     }
 
-    let is_valid =
-        |k: &&InputKline| k.open.is_some() && k.close.is_some() && k.close_time.is_some();
-
+    let is_valid = |k: &&InputKline| k.open.is_some() && k.close.is_some() && k.close_time.is_some();
     let first_kline = klines.iter().find(is_valid)?;
     let last_kline = klines.iter().rfind(is_valid)?;
 
@@ -112,17 +110,12 @@ fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
 // --- Main Execution (Refactored) ---
 
 pub async fn run() -> Result<()> {
-    // 1. Initialize Manager (Handles paths and storage dir creation)
     let storage = AsyncStorageManager::new_relative("storage").await?;
 
-    println!("Reading and parsing klines.json...");
-
-    // 2. Load Data using Generic Manager
-    // We try to load. If it fails (file missing), we handle it gracefully.
     let all_symbols_data: Vec<SymbolData> = match storage.load("klines").await {
         Ok(data) => data,
-        Err(e) => {
-            eprintln!("Could not load klines.json: {}. Skipping analysis.", e);
+        Err(_) => {
+            // Silently return if file doesn't exist, as the TUI will show empty state.
             return Ok(());
         }
     };
@@ -130,7 +123,6 @@ pub async fn run() -> Result<()> {
     let mut results = Vec::with_capacity(all_symbols_data.len());
     let mut max_close_time = 0;
 
-    // 3. Process Data (Pure logic, no I/O)
     for symbol_data in all_symbols_data {
         if let Some((movement_pct, last_close_time)) = analyze_klines_data(&symbol_data.klines) {
             results.push(ResultItem {
@@ -145,7 +137,6 @@ pub async fn run() -> Result<()> {
         }
     }
 
-    // Sort results
     results.sort_unstable_by(|a, b| {
         b.movement_pct
             .partial_cmp(&a.movement_pct)
@@ -153,7 +144,6 @@ pub async fn run() -> Result<()> {
     });
 
     if results.is_empty() {
-        println!("No valid data to process.");
         return Ok(());
     }
 
@@ -162,8 +152,6 @@ pub async fn run() -> Result<()> {
         results,
     };
 
-    // 4. Save Results using Generic Manager
-    println!("Saving {} results to storage...", output_data.results.len());
     storage.save("results", &output_data).await?;
 
     Ok(())

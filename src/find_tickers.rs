@@ -1,7 +1,7 @@
 use crate::storage_utils::{AppConfig, AsyncStorageManager};
 use anyhow::Result;
 use reqwest::Client;
-use serde::{Deserialize, Serialize}; // Serialize is now used
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
@@ -53,10 +53,8 @@ fn matches_filters(symbol: &Map<String, Value>, filters: &HashMap<String, String
 pub async fn fetch_exchange_info() -> Result<()> {
     let storage = AsyncStorageManager::new_relative("storage").await?;
 
-    println!("Loading configuration...");
     let config: AppConfig = storage.load("config").await?;
 
-    println!("Fetching exchange info from Binance...");
     let client = Client::new();
     let response = client
         .get("https://fapi.binance.com/fapi/v1/exchangeInfo")
@@ -66,21 +64,14 @@ pub async fn fetch_exchange_info() -> Result<()> {
 
     let exchange_info: ExchangeInfo = response.json().await?;
 
-    let matching_count = exchange_info
+    // We keep the logic, just remove the print statements.
+    let _matching_count = exchange_info
         .symbols
         .iter()
         .filter(|s| matches_filters(s, &config.filters))
         .count();
 
-    println!(
-        "Total Symbols: {}. Matching Filter Criteria: {}",
-        exchange_info.symbols.len(),
-        matching_count
-    );
-
-    // This line caused the error before. Now it works because ExchangeInfo is Serializable.
     storage.save("exchange_info", &exchange_info).await?;
-    println!("Exchange info saved.");
 
     Ok(())
 }

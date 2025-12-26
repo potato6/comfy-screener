@@ -1,35 +1,19 @@
-mod comfy_table;
+mod analysis;
 mod cumulative_price_change;
 mod find_tickers;
 mod klines;
 mod storage_utils;
+mod tui;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Step 1: Fetch Metadata
-    println!("\n--- Step 1: Fetching Exchange Info ---");
-    if let Err(e) = find_tickers::fetch_exchange_info().await {
-        eprintln!("Error fetching info: {}", e);
-        return Err(e);
+    // Directly launch the TUI.
+    if let Err(e) = tui::run_tui().await {
+        // If the TUI exits with an error, print it to stderr.
+        // Benign "Quit" errors are suppressed.
+        if !e.to_string().contains("Quit") {
+            eprintln!("TUI Error: {}", e);
+        }
     }
-
-    // Step 2: Download Candles
-    println!("\n--- Step 2: Fetching Klines ---");
-    if let Err(e) = klines::run().await {
-        eprintln!("Error fetching klines: {}", e);
-    }
-
-    // Step 3: Analyze Data
-    println!("\n--- Step 3: Analyzing Price Changes ---");
-    if let Err(e) = cumulative_price_change::run().await {
-        eprintln!("Error analyzing data: {}", e);
-    }
-
-    // Step 4: Display Results
-    println!("\n--- Step 4: Displaying Table ---");
-    if let Err(e) = comfy_table::run().await {
-        eprintln!("Error displaying table: {}", e);
-    }
-
     Ok(())
 }
