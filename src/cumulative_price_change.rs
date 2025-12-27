@@ -10,11 +10,11 @@ use std::fmt;
 pub struct InputKline {
     // Made public
     #[serde(deserialize_with = "deserialize_f64_lenient")]
-    pub open: Option<f64>, // Made public
+    pub open: Option<f64>,
     #[serde(deserialize_with = "deserialize_f64_lenient")]
-    pub close: Option<f64>, // Made public
+    pub close: Option<f64>,
     #[serde(rename = "closeTime")]
-    pub close_time: Option<i64>, // Made public
+    pub close_time: Option<i64>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -32,7 +32,7 @@ struct ResultItem {
     movement_pct: f64,
     #[serde(rename = "subType")]
     sub_type: Vec<String>,
-    rsi: Option<f64>, // Added RSI field
+    rsi: Option<f64>,
 }
 
 #[derive(Serialize, Debug)]
