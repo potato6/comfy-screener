@@ -8,5 +8,6 @@
         "contractType": "PERPETUAL",
         "quoteAsset": "USDT",
         "underlyingType": "COIN"
-    }
+    },
+    "rsi_period": 14
 }

@@ -15,9 +15,15 @@ pub struct KlineConfig {
 pub struct AppConfig {
     pub klines: KlineConfig,
 
-    // This is now the only place responsible for filtering logic
     #[serde(default)]
     pub filters: HashMap<String, String>,
+
+    #[serde(default = "default_rsi_period")]
+    pub rsi_period: u32,
+}
+
+fn default_rsi_period() -> u32 {
+    14
 }
 
 // STORAGE MANAGER

@@ -1,4 +1,4 @@
-use crate::storage_utils::{AppConfig, AsyncStorageManager};
+use crate::storage_utils::AsyncStorageManager;
 use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -50,10 +50,8 @@ fn matches_filters(symbol: &Map<String, Value>, filters: &HashMap<String, String
 
 // MAIN
 
-pub async fn fetch_exchange_info() -> Result<()> {
+pub async fn fetch_exchange_info(filters: &HashMap<String, String>) -> Result<()> {
     let storage = AsyncStorageManager::new_relative("storage").await?;
-
-    let config: AppConfig = storage.load("config").await?;
 
     let client = Client::new();
     let response = client
@@ -68,7 +66,7 @@ pub async fn fetch_exchange_info() -> Result<()> {
     let _matching_count = exchange_info
         .symbols
         .iter()
-        .filter(|s| matches_filters(s, &config.filters))
+        .filter(|s| matches_filters(s, filters))
         .count();
 
     storage.save("exchange_info", &exchange_info).await?;

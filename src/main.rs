@@ -4,6 +4,7 @@ mod find_tickers;
 mod klines;
 mod storage_utils;
 mod tui;
+mod indicators;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

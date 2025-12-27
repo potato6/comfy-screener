@@ -32,11 +32,14 @@ pub struct AssetResult {
     #[serde(rename = "subType")]
     pub sub_type: Vec<String>,
     pub movement_pct: f64,
+    pub rsi: Option<f64>, // Added RSI field
 }
 
 struct App {
     data: OutputData,
     is_refreshing: bool,
+    indicators: Vec<String>,
+    selected_indicator_index: usize,
 }
 
 impl App {
@@ -48,6 +51,11 @@ impl App {
         Ok(Self {
             data: initial_data,
             is_refreshing: false,
+            indicators: vec![
+                "Cumulative Price Change".to_string(),
+                "Relative Strength Index".to_string(),
+            ],
+            selected_indicator_index: 0,
         })
     }
 
@@ -134,26 +142,102 @@ fn handle_key_event(key: KeyEvent, app: &mut App, tx: &mpsc::Sender<Result<Outpu
                 let _ = tx_clone.send(result).await;
             });
         }
+        KeyCode::Up => {
+            if !app.indicators.is_empty() {
+                app.selected_indicator_index = app
+                    .selected_indicator_index
+                    .checked_sub(1)
+                    .unwrap_or(app.indicators.len() - 1);
+            }
+        }
+        KeyCode::Down => {
+            if !app.indicators.is_empty() {
+                app.selected_indicator_index =
+                    (app.selected_indicator_index + 1) % app.indicators.len();
+            }
+        }
+        KeyCode::Char(c) => {
+            if c.is_ascii_digit() {
+                let digit = c.to_digit(10).unwrap_or(0);
+                if digit > 0 && digit <= app.indicators.len() as u32 {
+                    app.selected_indicator_index = (digit - 1) as usize;
+                }
+            }
+        }
         _ => {}
     }
     true
 }
 
 fn ui(f: &mut Frame, app: &App) {
-    let main_chunks = Layout::vertical([Constraint::Min(0)]).split(f.size());
+    let main_layout = Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
+        .split(f.size());
+
+    let left_chunks = Layout::vertical([Constraint::Min(0)]).split(main_layout[1]);
     let top_chunks =
-        Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).split(main_chunks[0]);
+        Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).split(left_chunks[0]);
+
+    // Render the sidebar
+    let sidebar_block = Block::default()
+        .borders(Borders::ALL)
+        .title_alignment(Alignment::Center);
+    let inner_sidebar_area = sidebar_block.inner(main_layout[0]);
+    f.render_widget(sidebar_block, main_layout[0]);
+
+    let sidebar_chunks = Layout::vertical([
+        Constraint::Min(1),    // For the indicator list
+        Constraint::Length(1), // For the "F5 refreshes data" instruction
+    ])
+    .split(inner_sidebar_area);
+
+    let indicator_lines: Vec<Line> = app
+        .indicators
+        .iter()
+        .enumerate()
+        .map(|(i, indicator)| {
+            let mut line = Line::from(indicator.clone());
+            if i == app.selected_indicator_index {
+                line = line.style(Style::default().fg(Color::Yellow).bg(Color::DarkGray));
+            }
+            line
+        })
+        .collect();
+
+    f.render_widget(Paragraph::new(indicator_lines), sidebar_chunks[0]);
+
+    f.render_widget(
+        Paragraph::new("F5 refreshes data").alignment(Alignment::Center),
+        sidebar_chunks[1],
+    );
 
     let time_str = format_timestamp(app.data.last_updated_timestamp);
     f.render_widget(
         Block::default()
             .borders(Borders::ALL)
-            .title_alignment(Alignment::Center),
+            .title_alignment(Alignment::Center)
+            .title(format!("Last Updated: {}", time_str)),
         top_chunks[0],
     );
 
-    let header = Row::new(["Rank", "Asset", "Type", "Movement (%)"])
-        .style(Style::default().bg(Color::DarkGray));
+    let active_indicator_is_rsi = app.selected_indicator_index == 1; // 1 is the index for "Relative Strength Index"
+
+    let header_cells = if active_indicator_is_rsi {
+        vec![
+            Cell::from("Rank"),
+            Cell::from("Asset"),
+            Cell::from("Type"),
+            Cell::from("RSI"),
+        ]
+    } else {
+        vec![
+            Cell::from("Rank"),
+            Cell::from("Asset"),
+            Cell::from("Type"),
+            Cell::from("Movement (%)"),
+        ]
+    };
+
+    let header = Row::new(header_cells).style(Style::default().bg(Color::DarkGray));
     let top_mover_pct = app.data.results.first().map_or(1.0, |r| r.movement_pct);
     let safe_top_pct = if top_mover_pct == 0.0 {
         1.0
@@ -178,16 +262,21 @@ fn ui(f: &mut Frame, app: &App) {
                 format!("({})", asset.sub_type.join(", "))
             };
 
+            let main_value_cell = if active_indicator_is_rsi {
+                Cell::from(Line::from(format!("{:.2}", asset.rsi.unwrap_or(0.0))))
+                    .style(Style::default().fg(Color::Rgb(0, green_val, 0))) // Use green for RSI as well for consistency
+            } else {
+                Cell::from(Line::from(format!("{:.2}%", asset.movement_pct)))
+                    .style(Style::default().fg(Color::Rgb(0, green_val, 0)))
+            };
+
             Row::new([
                 Cell::from(format!("{}", i + 1)).style(Style::default().fg(Color::DarkGray)),
                 Cell::from(asset.symbol.clone())
                     .style(Style::default().fg(Color::Rgb(0, cyan_val, cyan_val))),
                 Cell::from(subtype_str)
                     .style(Style::default().fg(Color::Rgb(gray_val, gray_val, gray_val))),
-                Cell::from(
-                    Line::from(format!("{:.2}%", asset.movement_pct)).alignment(Alignment::Right),
-                )
-                .style(Style::default().fg(Color::Rgb(0, green_val, 0))),
+                main_value_cell,
             ])
             .height(1)
         });
@@ -196,9 +285,9 @@ fn ui(f: &mut Frame, app: &App) {
             rows,
             [
                 Constraint::Length(6),      // Rank: Keep fixed small width
-                Constraint::Percentage(20), // Asset: Takes 20% of width
-                Constraint::Percentage(50), // Type: Takes 50% (main flexible column)
-                Constraint::Percentage(20), // Movement: Takes 20%
+                Constraint::Percentage(27), // Asset: Takes 27% of width
+                Constraint::Percentage(38), // Type: Takes 38% (main flexible column)
+                Constraint::Percentage(35), // Value: Takes 35%
             ],
         )
         .header(header)
@@ -207,7 +296,7 @@ fn ui(f: &mut Frame, app: &App) {
     );
 
     if app.is_refreshing {
-        let area = centered_rect(60, 20, f.size());
+        let area = centered_rect(60, 20, main_layout[1]);
         f.render_widget(Clear, area);
         f.render_widget(
             Paragraph::new("Running analysis pipeline...\nPlease wait.")

@@ -1,5 +1,5 @@
 use crate::find_tickers::ExchangeInfo;
-use crate::storage_utils::{AppConfig, AsyncStorageManager};
+use crate::storage_utils::{AsyncStorageManager, KlineConfig};
 use anyhow::Result;
 use regex::Regex;
 use reqwest::Client;
@@ -50,8 +50,14 @@ async fn fetch_kline(
         None => return None,
     };
 
-    let sub_types: Vec<String> = match symbol_map.get("underlyingSubType").and_then(|v| v.as_array()) {
-        Some(arr) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
+    let sub_types: Vec<String> = match symbol_map
+        .get("underlyingSubType")
+        .and_then(|v| v.as_array())
+    {
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect(),
         None => Vec::new(),
     };
 
@@ -66,13 +72,17 @@ async fn fetch_kline(
             let status = response.status();
 
             if status == 418 || status == 429 {
-                if let Ok(text) = response.text().await {
-                    if text.contains("-1003") {
+                if let Ok(text) = response.text().await
+                    && text.contains("-1003") {
                         let re = Regex::new(r"until\s+(\d+)").unwrap();
-                        if let Some(caps) = re.captures(&text) {
-                            if let Some(ts_match) = caps.get(1) {
-                                if let Ok(ban_until) = ts_match.as_str().parse::<u64>() {
-                                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+                        if let Some(caps) = re.captures(&text)
+                            && let Some(ts_match) = caps.get(1)
+                                && let Ok(ban_until) = ts_match.as_str().parse::<u64>() {
+                                    let now = SystemTime::now()
+                                        .duration_since(UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_millis()
+                                        as u64;
                                     if ban_until > now {
                                         let wait_ms = ban_until - now;
                                         let wait_sec = (wait_ms as f64 / 1000.0) + 5.0;
@@ -80,10 +90,7 @@ async fn fetch_kline(
                                         return None;
                                     }
                                 }
-                            }
-                        }
                     }
-                }
                 return None;
             }
 
@@ -93,9 +100,16 @@ async fn fetch_kline(
 
             match response.json::<Vec<Vec<Value>>>().await {
                 Ok(raw_klines) => {
-                    let klines_as_dicts = raw_klines.into_iter().map(|k| {
-                        KLINE_KEYS.iter().zip(k.into_iter()).map(|(&key, val)| (key.to_string(), val)).collect()
-                    }).collect();
+                    let klines_as_dicts = raw_klines
+                        .into_iter()
+                        .map(|k| {
+                            KLINE_KEYS
+                                .iter()
+                                .zip(k.into_iter())
+                                .map(|(&key, val)| (key.to_string(), val))
+                                .collect()
+                        })
+                        .collect();
 
                     Some(KlineResult {
                         symbol,
@@ -111,34 +125,33 @@ async fn fetch_kline(
 }
 
 fn matches_filters(symbol: &Map<String, Value>, filters: &HashMap<String, String>) -> bool {
-    filters.iter().all(|(key, required_value)| {
-        match symbol.get(key) {
+    filters
+        .iter()
+        .all(|(key, required_value)| match symbol.get(key) {
             Some(Value::String(s)) => s == required_value,
             Some(Value::Array(arr)) => arr.iter().any(|v| v.as_str() == Some(required_value)),
             Some(v) => &v.to_string() == required_value,
             None => false,
-        }
-    })
+        })
 }
 
-pub async fn run() -> Result<()> {
+pub async fn run(klines_config: &KlineConfig, filters: &HashMap<String, String>) -> Result<()> {
     let storage = AsyncStorageManager::new_relative("storage").await?;
-    let config: AppConfig = storage.load("config").await?;
     let exchange_info: ExchangeInfo = storage.load("exchange_info").await?;
 
     let symbols_to_fetch: Vec<Map<String, Value>> = exchange_info
         .symbols
         .into_iter()
-        .filter(|s| matches_filters(s, &config.filters))
+        .filter(|s| matches_filters(s, filters))
         .collect();
 
     let client = Client::builder().pool_max_idle_per_host(50).build()?;
-    let limit_str = config.klines.limit.to_string();
+    let limit_str = klines_config.limit.to_string();
     let kline_params = vec![
-        ("interval", config.klines.interval.clone()),
+        ("interval", klines_config.interval.clone()),
         ("limit", limit_str),
     ];
-    let weight_per_req = calculate_request_weight(config.klines.limit);
+    let weight_per_req = calculate_request_weight(klines_config.limit);
 
     let api_limit_total = exchange_info
         .rate_limits
@@ -154,8 +167,11 @@ pub async fn run() -> Result<()> {
 
     for (i, batch) in symbols_to_fetch.chunks(batch_size).enumerate() {
         let start_time = Instant::now();
-        
-        let tasks: Vec<_> = batch.iter().map(|s| fetch_kline(&client, s, &kline_params)).collect();
+
+        let tasks: Vec<_> = batch
+            .iter()
+            .map(|s| fetch_kline(&client, s, &kline_params))
+            .collect();
         let results = futures::future::join_all(tasks).await;
         all_results.extend(results.into_iter().flatten());
 

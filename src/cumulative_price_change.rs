@@ -7,13 +7,13 @@ use std::fmt;
 // --- Data Structures & Custom Deserialization (Unchanged) ---
 
 #[derive(Deserialize, Debug)]
-struct InputKline {
+pub struct InputKline { // Made public
     #[serde(deserialize_with = "deserialize_f64_lenient")]
-    open: Option<f64>,
+    pub open: Option<f64>, // Made public
     #[serde(deserialize_with = "deserialize_f64_lenient")]
-    close: Option<f64>,
+    pub close: Option<f64>, // Made public
     #[serde(rename = "closeTime")]
-    close_time: Option<i64>,
+    pub close_time: Option<i64>, // Made public
 }
 
 #[derive(Deserialize, Debug)]
@@ -31,6 +31,7 @@ struct ResultItem {
     movement_pct: f64,
     #[serde(rename = "subType")]
     sub_type: Vec<String>,
+    rsi: Option<f64>, // Added RSI field
 }
 
 #[derive(Serialize, Debug)]
@@ -44,7 +45,7 @@ struct LenientF64Visitor;
 impl<'de> Visitor<'de> for LenientF64Visitor {
     type Value = Option<f64>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result { // Corrected return type
         formatter.write_str("a float, an integer, or a string representing a number")
     }
 
@@ -83,6 +84,7 @@ where
     deserializer.deserialize_any(LenientF64Visitor)
 }
 
+
 // --- Domain Logic (Unchanged) ---
 
 fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
@@ -90,7 +92,8 @@ fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
         return None;
     }
 
-    let is_valid = |k: &&InputKline| k.open.is_some() && k.close.is_some() && k.close_time.is_some();
+    let is_valid =
+        |k: &&InputKline| k.open.is_some() && k.close.is_some() && k.close_time.is_some();
     let first_kline = klines.iter().find(is_valid)?;
     let last_kline = klines.iter().rfind(is_valid)?;
 
@@ -109,7 +112,7 @@ fn analyze_klines_data(klines: &[InputKline]) -> Option<(f64, i64)> {
 
 // --- Main Execution (Refactored) ---
 
-pub async fn run() -> Result<()> {
+pub async fn run(rsi_period: u32) -> Result<()> {
     let storage = AsyncStorageManager::new_relative("storage").await?;
 
     let all_symbols_data: Vec<SymbolData> = match storage.load("klines").await {
@@ -124,11 +127,14 @@ pub async fn run() -> Result<()> {
     let mut max_close_time = 0;
 
     for symbol_data in all_symbols_data {
+        let rsi_value = crate::indicators::calculate_rsi(&symbol_data.klines, rsi_period); // Call the moved RSI function
+
         if let Some((movement_pct, last_close_time)) = analyze_klines_data(&symbol_data.klines) {
             results.push(ResultItem {
                 symbol: symbol_data.symbol,
                 movement_pct,
                 sub_type: symbol_data.underlying_sub_type,
+                rsi: rsi_value, // Store calculated RSI
             });
 
             if last_close_time > max_close_time {
