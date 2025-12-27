@@ -1,6 +1,9 @@
 //! This module contains the core analysis pipeline logic.
 
-use crate::{cumulative_price_change, find_tickers, klines, storage_utils::{AsyncStorageManager, AppConfig}};
+use crate::{
+    cumulative_price_change, find_tickers, klines,
+    storage_utils::{AppConfig, AsyncStorageManager},
+};
 use anyhow::Result;
 
 /// Runs the full analysis pipeline:

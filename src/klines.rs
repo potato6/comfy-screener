@@ -73,24 +73,25 @@ async fn fetch_kline(
 
             if status == 418 || status == 429 {
                 if let Ok(text) = response.text().await
-                    && text.contains("-1003") {
-                        let re = Regex::new(r"until\s+(\d+)").unwrap();
-                        if let Some(caps) = re.captures(&text)
-                            && let Some(ts_match) = caps.get(1)
-                                && let Ok(ban_until) = ts_match.as_str().parse::<u64>() {
-                                    let now = SystemTime::now()
-                                        .duration_since(UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_millis()
-                                        as u64;
-                                    if ban_until > now {
-                                        let wait_ms = ban_until - now;
-                                        let wait_sec = (wait_ms as f64 / 1000.0) + 5.0;
-                                        tokio::time::sleep(Duration::from_secs_f64(wait_sec)).await;
-                                        return None;
-                                    }
-                                }
+                    && text.contains("-1003")
+                {
+                    let re = Regex::new(r"until\s+(\d+)").unwrap();
+                    if let Some(caps) = re.captures(&text)
+                        && let Some(ts_match) = caps.get(1)
+                        && let Ok(ban_until) = ts_match.as_str().parse::<u64>()
+                    {
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as u64;
+                        if ban_until > now {
+                            let wait_ms = ban_until - now;
+                            let wait_sec = (wait_ms as f64 / 1000.0) + 5.0;
+                            tokio::time::sleep(Duration::from_secs_f64(wait_sec)).await;
+                            return None;
+                        }
                     }
+                }
                 return None;
             }
 

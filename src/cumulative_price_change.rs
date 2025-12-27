@@ -7,7 +7,8 @@ use std::fmt;
 // --- Data Structures & Custom Deserialization (Unchanged) ---
 
 #[derive(Deserialize, Debug)]
-pub struct InputKline { // Made public
+pub struct InputKline {
+    // Made public
     #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub open: Option<f64>, // Made public
     #[serde(deserialize_with = "deserialize_f64_lenient")]
@@ -45,7 +46,8 @@ struct LenientF64Visitor;
 impl<'de> Visitor<'de> for LenientF64Visitor {
     type Value = Option<f64>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result { // Corrected return type
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        // Corrected return type
         formatter.write_str("a float, an integer, or a string representing a number")
     }
 
@@ -83,7 +85,6 @@ where
 {
     deserializer.deserialize_any(LenientF64Visitor)
 }
-
 
 // --- Domain Logic (Unchanged) ---
 

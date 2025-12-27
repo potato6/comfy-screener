@@ -38,7 +38,23 @@ fn matches_filters(symbol: &Map<String, Value>, filters: &HashMap<String, String
                 }
             }
             Some(v) => {
-                if v.to_string() != *required_value {
+                let matches = if v.is_number() {
+                    required_value
+                        .parse::<serde_json::Number>()
+                        .is_ok_and(|n| v == &serde_json::Value::Number(n))
+                } else if v.is_boolean() {
+                    required_value
+                        .parse::<bool>()
+                        .is_ok_and(|b| v == &serde_json::Value::Bool(b))
+                } else if v.is_null() {
+                    required_value == "null"
+                } else {
+                    // Fallback for other types (objects, arrays) or if required_value isn't a simple literal
+                    serde_json::from_str::<serde_json::Value>(required_value)
+                        .is_ok_and(|req_val| v == &req_val)
+                };
+
+                if !matches {
                     return false;
                 }
             }

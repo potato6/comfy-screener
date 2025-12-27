@@ -170,7 +170,7 @@ fn handle_key_event(key: KeyEvent, app: &mut App, tx: &mpsc::Sender<Result<Outpu
 }
 
 fn ui(f: &mut Frame, app: &App) {
-    let main_layout = Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
+    let main_layout = Layout::horizontal([Constraint::Percentage(18), Constraint::Percentage(79)])
         .split(f.size());
 
     let left_chunks = Layout::vertical([Constraint::Min(0)]).split(main_layout[1]);

@@ -1,10 +1,10 @@
 mod analysis;
 mod cumulative_price_change;
 mod find_tickers;
+mod indicators;
 mod klines;
 mod storage_utils;
 mod tui;
-mod indicators;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
